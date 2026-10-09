@@ -14,15 +14,15 @@ MCP-серверы (Model Context Protocol), которые подключают
 
 **Claude Code**
 ```bash
-claude mcp add wb -e WB_TOKEN=ваш_токен -- npx -y @tkbk/mcp wb
-claude mcp add ozon -e OZON_CLIENT_ID=123 -e OZON_API_KEY=ключ -- npx -y @tkbk/mcp ozon
+claude mcp add wb -e WB_TOKEN=ваш_токен -- npx -y github:berdniko9544-gif/tkbk-mcp wb
+claude mcp add ozon -e OZON_CLIENT_ID=123 -e OZON_API_KEY=ключ -- npx -y github:berdniko9544-gif/tkbk-mcp ozon
 ```
 
 **Cursor / Claude Desktop** (`mcp.json` / `claude_desktop_config.json`)
 ```json
 {
   "mcpServers": {
-    "wildberries": { "command": "npx", "args": ["-y", "@tkbk/mcp", "wb"], "env": { "WB_TOKEN": "ваш_токен" } }
+    "wildberries": { "command": "npx", "args": ["-y", "github:berdniko9544-gif/tkbk-mcp", "wb"], "env": { "WB_TOKEN": "ваш_токен" } }
   }
 }
 ```
