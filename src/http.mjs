@@ -5,7 +5,7 @@ import http from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { buildServer, VERSION } from './core.mjs';
 import { SERVICES } from './index.mjs';
-import { bearerKey, createAllowList, createKeyValidator, isKeyFormat, keyIdOf } from './hosted/auth.mjs';
+import { anySubscription, bearerKey, createAllowList, createKeyValidator, createSiteAccess, isKeyFormat, keyIdOf } from './hosted/auth.mjs';
 import { credentialsFor, missingHeadersHint } from './hosted/credentials.mjs';
 import { bucketOf, clientIp, createRateLimiter, isInternalIp } from './hosted/limits.mjs';
 
@@ -41,10 +41,10 @@ const retryAfter = (seconds) => ({ 'retry-after': String(seconds) });
 const bearerChallenge = (error) => ({ 'www-authenticate': `Bearer realm="tkbk-mcp", error="${error}"` });
 
 /** Subscription and per-key rate limit of a key the gateway accepted. */
-async function entitle(keyId, ctx) {
+async function entitle(keyId, key, ctx) {
   let subscribed;
   try {
-    subscribed = await ctx.isSubscribed(keyId);
+    subscribed = await ctx.isSubscribed(keyId, key);
   } catch (e) {
     return deny(503, 'Subscription check is temporarily unavailable: retry in a minute.', retryAfter(RETRY_LATER_SEC), { reason: 'billing-down', err: e?.message });
   }
@@ -77,7 +77,7 @@ async function admit(req, ctx) {
   }
   if (check.status !== 'valid') return deny(503, 'Key check is temporarily unavailable: retry in a minute.', retryAfter(RETRY_LATER_SEC), { reason: 'gateway-down' });
   const keyId = keyIdOf(key);
-  return { ...(await entitle(keyId, ctx)), keyId };
+  return { ...(await entitle(keyId, key, ctx)), keyId };
 }
 
 /** One stateless MCP exchange: a fresh server with this request's credentials, JSON answers (no SSE). */
@@ -164,18 +164,23 @@ const intOr = (value, fallback) => {
 
 /**
  * Server options from the environment: PORT, HOST, TKBK_KEY_CHECK_URL, MCP_ALLOWED_KEYS, MCP_ALLOWED_KEYS_FILE,
- * MCP_RATE_LIMIT_PER_MIN, MCP_AUTH_FAIL_LIMIT, MCP_B24_HOSTS.
+ * MCP_ACCESS_URL + MCP_ACCESS_SECRET (subscriptions bought on the site), MCP_RATE_LIMIT_PER_MIN, MCP_AUTH_FAIL_LIMIT,
+ * MCP_B24_HOSTS.
  */
 export function configFromEnv(env = process.env, log = writeLog) {
   const keyCheckUrl = new URL(env.TKBK_KEY_CHECK_URL || DEFAULT_KEY_CHECK_URL).href;
   const allowList = createAllowList({ ids: env.MCP_ALLOWED_KEYS, file: env.MCP_ALLOWED_KEYS_FILE, log });
+  const site = env.MCP_ACCESS_URL && env.MCP_ACCESS_SECRET
+    ? createSiteAccess({ url: new URL(env.MCP_ACCESS_URL).href, secret: env.MCP_ACCESS_SECRET, userAgent: `tkbk-mcp/${VERSION}` })
+    : null;
   return {
     port: intOr(env.PORT, DEFAULT_PORT),
     host: env.HOST || DEFAULT_HOST,
     keyCheckUrl,
     allowList,
     validator: createKeyValidator({ checkUrl: keyCheckUrl, userAgent: `tkbk-mcp/${VERSION}` }),
-    isSubscribed: allowList.isSubscribed,
+    site,
+    isSubscribed: site ? anySubscription(allowList.isSubscribed, site.isSubscribed) : allowList.isSubscribed,
     ratePerMin: intOr(env.MCP_RATE_LIMIT_PER_MIN, DEFAULT_RATE_PER_MIN),
     authFailLimit: intOr(env.MCP_AUTH_FAIL_LIMIT, DEFAULT_AUTH_FAILS),
     b24Hosts: String(env.MCP_B24_HOSTS ?? '').split(/[\s,]+/).filter(Boolean),
@@ -189,9 +194,9 @@ export function startHttpServer(env = process.env) {
   const server = createHttpServer(config);
   server.listen(config.port, config.host, () => {
     const check = new URL(config.keyCheckUrl);
-    const subscriptions = config.allowList.describe();
+    const subscriptions = { ...config.allowList.describe(), site: Boolean(config.site) };
     config.log({ kind: 'start', version: VERSION, port: server.address().port, keyCheck: `${check.origin}${check.pathname}`, subscriptions, ratePerMin: config.ratePerMin });
-    if (!subscriptions.open && !subscriptions.ids) config.log({ kind: 'warn', msg: 'no subscriptions: set MCP_ALLOWED_KEYS or MCP_ALLOWED_KEYS_FILE, every key gets 403' });
+    if (!subscriptions.open && !subscriptions.ids && !subscriptions.site) config.log({ kind: 'warn', msg: 'no subscriptions: set MCP_ACCESS_URL + MCP_ACCESS_SECRET or MCP_ALLOWED_KEYS(_FILE), every key gets 403' });
   });
   const stop = (signal) => {
     config.log({ kind: 'stop', signal });

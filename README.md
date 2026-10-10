@@ -71,6 +71,7 @@ docker exec tkbk-caddy wget -qO- http://tkbk-mcp:8787/healthz
 | `PORT` | `8787` | порт |
 | `TKBK_KEY_CHECK_URL` | `https://api.tkbk.online/openai/v1/models`; в compose — `http://tkbk-gateway:8080/openai/v1/models` | проверка ключа: `GET` с `x-api-key`, 200 — действует, 401/403 — нет; кэш 5 мин (отказ — 1 мин). Не `/v1/models`: там шлюз отвечает 200 на любой ключ |
 | `MCP_ALLOWED_KEYS` | — | id ключей с подпиской через запятую; `*` — любой действующий ключ (открытая бета) |
+| `MCP_ACCESS_URL` + `MCP_ACCESS_SECRET` | в compose `http://tkbk-web:3000/api/mcp/access`; секрет — в `.env` | подписки, купленные на tkbk.online/mcp (490 ₽/мес или любой платный тариф Seller OS); ответ кешируется на 5 мин, отказ — на 1 мин |
 | `MCP_ALLOWED_KEYS_FILE` | в compose `/data/allowed-keys.txt` (`./data` на хосте) | id по одному в строке, `#` — комментарий; перечитывается за 10 с после изменения |
 | `MCP_RATE_LIMIT_PER_MIN` | `60` | запросов в минуту на ключ (0 — без лимита) |
 | `MCP_AUTH_FAIL_LIMIT` | `20` | неверных ключей с одного адреса за 10 минут, дальше 429 (0 — выкл.) |

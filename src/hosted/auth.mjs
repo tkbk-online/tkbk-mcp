@@ -147,3 +147,73 @@ export function createAllowList({ ids = '', file = '', reloadMs = ALLOW_LIST_REL
     },
   };
 }
+
+const SITE_TTL_MS = 5 * 60_000;
+const SITE_NEGATIVE_TTL_MS = 60_000;
+
+/**
+ * Subscriptions bought on tkbk.online: POST url {key} with x-mcp-secret → {ok, active, until}. Answers are cached by key
+ * id (active ones until min(ttl, paid end), inactive ones negativeTtlMs so a fresh purchase works within a minute); a
+ * key active within staleMs stays active while the site cannot answer; otherwise the check throws (→ 503).
+ * @param {{url: string, secret: string, fetchImpl?: typeof fetch, now?: () => number, ttlMs?: number,
+ *   negativeTtlMs?: number, staleMs?: number, timeoutMs?: number, maxKeys?: number, userAgent?: string}} options
+ */
+export function createSiteAccess({
+  url, secret, fetchImpl = globalThis.fetch, now = Date.now, ttlMs = SITE_TTL_MS, negativeTtlMs = SITE_NEGATIVE_TTL_MS,
+  staleMs = STALE_IF_ERROR_MS, timeoutMs = KEY_CHECK_TIMEOUT_MS, maxKeys = MAX_CACHED_KEYS, userAgent = 'tkbk-mcp',
+}) {
+  if (!url || !secret) throw new Error('createSiteAccess: url and secret are required');
+  const cache = new Map(); // key id -> {active: boolean, at: number, until: number}
+  const inflight = new Map();
+  async function ask(key) {
+    const res = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json', 'x-mcp-secret': secret, 'user-agent': userAgent },
+      body: JSON.stringify({ key }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const body = await res.json().catch(() => null);
+    if (res.status !== HTTP_OK || !body?.ok) throw new Error(`site access check: HTTP ${res.status}`);
+    const until = Date.parse(body.until ?? '') || 0;
+    return { active: body.active === true, until };
+  }
+  async function isSubscribed(keyId, key) {
+    const hit = cache.get(keyId);
+    const t = now();
+    if (hit) {
+      const fresh = hit.active ? t - hit.at < ttlMs && (!hit.until || t < hit.until) : t - hit.at < negativeTtlMs;
+      if (fresh) return hit.active;
+    }
+    if (!key) return false;
+    let pending = inflight.get(keyId);
+    if (!pending) {
+      pending = ask(key).finally(() => inflight.delete(keyId));
+      inflight.set(keyId, pending);
+    }
+    try {
+      const r = await pending;
+      remember(cache, keyId, { active: r.active, at: now(), until: r.until }, maxKeys);
+      return r.active;
+    } catch (e) {
+      if (hit?.active && t - hit.at < staleMs && (!hit.until || t < hit.until)) return true;
+      throw e;
+    }
+  }
+  return { isSubscribed, size: () => cache.size };
+}
+
+/** Subscribed if any hook says so; checked in order (the local allow-list first, it never leaves the process). */
+export function anySubscription(...hooks) {
+  return async (keyId, key) => {
+    let failure = null;
+    for (const hook of hooks) {
+      try {
+        if (await hook(keyId, key)) return true;
+      } catch (e) {
+        failure = e;
+      }
+    }
+    if (failure) throw failure;
+    return false;
+  };
+}

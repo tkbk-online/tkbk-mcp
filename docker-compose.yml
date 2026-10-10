@@ -19,6 +19,8 @@ services:
       # invalid-key limit counts the real client address
       TKBK_KEY_CHECK_URL: ${TKBK_KEY_CHECK_URL:-http://tkbk-gateway:8080/openai/v1/models}
       MCP_ALLOWED_KEYS_FILE: /data/allowed-keys.txt
+      # subscriptions bought on the site (490 ₽/month or a paid Seller OS plan); MCP_ACCESS_SECRET comes from .env
+      MCP_ACCESS_URL: ${MCP_ACCESS_URL:-http://tkbk-web:3000/api/mcp/access}
     volumes:
       # a directory, not the file: an atomic rewrite (rename) of allowed-keys.txt is seen without a restart
       - ./data:/data:ro
