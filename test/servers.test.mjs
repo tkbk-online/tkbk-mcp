@@ -1,28 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { SERVICES, buildServer } from '../src/index.mjs';
+import { readFileSync } from 'node:fs';
+import { connect, installFetchMock, textOf } from './helpers.mjs';
 
-// fetch mock: records calls, answers by URL
-const calls = [];
-const routes = [];
-globalThis.fetch = async (url, init = {}) => {
-  calls.push({ url: String(url), init });
-  const r = routes.find((x) => x.match.test(String(url)));
-  const body = r ? r.body : { message: 'not found' };
-  return new Response(JSON.stringify(body), { status: r ? r.status ?? 200 : 404, headers: { 'content-type': 'application/json' } });
-};
-const route = (match, body, status) => routes.unshift({ match, body, status });
-
-async function connect(name, env) {
-  const server = buildServer(SERVICES[name], env);
-  const [a, b] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'test', version: '0' });
-  await Promise.all([server.connect(a), client.connect(b)]);
-  return client;
-}
-const textOf = (r) => r.content[0].text;
+const { calls, route } = installFetchMock();
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('every service lists its tools with descriptions', async () => {
   for (const name of ['wb', 'ozon', 'yandex-market', 'bitrix24', 'amocrm']) {
@@ -31,6 +13,11 @@ test('every service lists its tools with descriptions', async () => {
     assert.ok(tools.length >= 3, name);
     for (const t of tools) assert.ok(t.description.length > 20, `${name}/${t.name}`);
   }
+});
+
+test('the server reports the package version', async () => {
+  const c = await connect('wb', {});
+  assert.deepEqual(c.getServerVersion(), { name: 'tkbk-wildberries', version: pkg.version });
 });
 
 test('not configured → clear message, no request', async () => {
@@ -88,7 +75,7 @@ test('amocrm and yandex market: auth headers', async () => {
   assert.equal(JSON.parse(textOf(r))[0].name, 'Сделка');
   assert.equal(calls.at(-1).init.headers.Authorization, 'Bearer t');
   assert.match(calls.at(-1).url, /order%5Bcreated_at%5D=desc/);
-  route(/\/campaigns$/, { campaigns: [{ id: 9, domain: 'shop', business: { id: 8 }, placementType: 'FBS' }] });
+  route(/\/v2\/campaigns\?/, { campaigns: [{ id: 9, domain: 'shop', business: { id: 8 }, placementType: 'FBS' }], paging: {} });
   const y = await connect('yandex-market', { YM_API_KEY: 'ym' });
   const yr = await y.callTool({ name: 'ym_campaigns', arguments: {} });
   assert.deepEqual(JSON.parse(textOf(yr))[0], { id: 9, domain: 'shop', businessId: 8, placementType: 'FBS' });

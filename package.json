@@ -1,6 +1,6 @@
 {
   "name": "@tkbk/mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP servers for Russian marketplaces and CRMs: Wildberries, Ozon, Yandex Market, Bitrix24, amoCRM. Works with Claude Code, Cursor, Claude Desktop.",
   "type": "module",
   "bin": {

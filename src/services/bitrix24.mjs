@@ -2,7 +2,17 @@
 // BITRIX24_WEBHOOK_URL = https://<portal>.bitrix24.ru/rest/<user_id>/<code>/
 import { request, z } from '../core.mjs';
 
-const call = (env, method, params = {}) => request(`${env.BITRIX24_WEBHOOK_URL.replace(/\/+$/, '')}/${method}.json`, { method: 'POST', body: params });
+const LIST_PAGE = 50; // Bitrix24 list methods return 50 records a page; `start` is the offset
+const LIST_DEFAULT = 20;
+
+/** REST call; lists are reads (retried on 5xx, which also is Bitrix24's QUERY_LIMIT_EXCEEDED), adds are not. */
+const call = (env, method, params = {}, { idempotent = false } = {}) =>
+  request(`${env.BITRIX24_WEBHOOK_URL.replace(/\/+$/, '')}/${method}.json`, { method: 'POST', body: params, idempotent });
+
+const listInput = {
+  limit: z.number().int().min(1).max(LIST_PAGE).optional(),
+  start: z.number().int().min(0).optional().describe(`Offset for older records: 0, ${LIST_PAGE}, ${LIST_PAGE * 2} …`),
+};
 
 export default {
   name: 'bitrix24',
@@ -12,18 +22,18 @@ export default {
     {
       name: 'b24_leads',
       description: 'Recent CRM leads (id, title, name, phone, email, status, created).',
-      input: { limit: z.number().int().min(1).max(50).optional(), status: z.string().optional().describe('STATUS_ID, e.g. NEW') },
-      run: async ({ limit = 20, status }, env) => {
-        const d = await call(env, 'crm.lead.list', { order: { DATE_CREATE: 'DESC' }, filter: status ? { STATUS_ID: status } : {}, select: ['ID', 'TITLE', 'NAME', 'LAST_NAME', 'PHONE', 'EMAIL', 'STATUS_ID', 'DATE_CREATE', 'OPPORTUNITY'] });
+      input: { ...listInput, status: z.string().optional().describe('STATUS_ID, e.g. NEW') },
+      run: async ({ limit = LIST_DEFAULT, start = 0, status }, env) => {
+        const d = await call(env, 'crm.lead.list', { order: { DATE_CREATE: 'DESC' }, filter: status ? { STATUS_ID: status } : {}, select: ['ID', 'TITLE', 'NAME', 'LAST_NAME', 'PHONE', 'EMAIL', 'STATUS_ID', 'DATE_CREATE', 'OPPORTUNITY'], start }, { idempotent: true });
         return (d?.result || []).slice(0, limit);
       },
     },
     {
       name: 'b24_deals',
       description: 'Recent CRM deals (id, title, stage, amount, created).',
-      input: { limit: z.number().int().min(1).max(50).optional(), stage: z.string().optional() },
-      run: async ({ limit = 20, stage }, env) => {
-        const d = await call(env, 'crm.deal.list', { order: { DATE_CREATE: 'DESC' }, filter: stage ? { STAGE_ID: stage } : {}, select: ['ID', 'TITLE', 'STAGE_ID', 'OPPORTUNITY', 'CURRENCY_ID', 'DATE_CREATE', 'CONTACT_ID'] });
+      input: { ...listInput, stage: z.string().optional() },
+      run: async ({ limit = LIST_DEFAULT, start = 0, stage }, env) => {
+        const d = await call(env, 'crm.deal.list', { order: { DATE_CREATE: 'DESC' }, filter: stage ? { STAGE_ID: stage } : {}, select: ['ID', 'TITLE', 'STAGE_ID', 'OPPORTUNITY', 'CURRENCY_ID', 'DATE_CREATE', 'CONTACT_ID'], start }, { idempotent: true });
         return (d?.result || []).slice(0, limit);
       },
     },
