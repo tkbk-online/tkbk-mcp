@@ -1,0 +1,38 @@
+# Hosted TKBK MCP on the TKBK server: Caddy (tkbk-caddy, network tkbk_default) proxies mcp.tkbk.online → tkbk-mcp:8787.
+# Health: docker exec tkbk-caddy wget -qO- http://tkbk-mcp:8787/healthz
+name: tkbk-mcp
+services:
+  mcp:
+    build:
+      context: .
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: tkbk-mcp:latest
+    container_name: tkbk-mcp
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8787"
+      # inside the Docker network: no TLS hop, and the gateway trusts our X-Forwarded-For (a private address), so its
+      # invalid-key limit counts the real client address
+      TKBK_KEY_CHECK_URL: ${TKBK_KEY_CHECK_URL:-http://tkbk-gateway:8080/openai/v1/models}
+      MCP_ALLOWED_KEYS_FILE: /data/allowed-keys.txt
+    volumes:
+      # a directory, not the file: an atomic rewrite (rename) of allowed-keys.txt is seen without a restart
+      - ./data:/data:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+    networks: [tkbk]
+networks:
+  tkbk:
+    external: true
+    name: tkbk_default

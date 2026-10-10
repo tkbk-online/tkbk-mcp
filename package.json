@@ -1,7 +1,7 @@
 {
   "name": "@tkbk/mcp",
   "version": "0.2.0",
-  "description": "MCP servers for Russian marketplaces and CRMs: Wildberries, Ozon, Yandex Market, Bitrix24, amoCRM. Works with Claude Code, Cursor, Claude Desktop.",
+  "description": "MCP servers for Russian marketplaces and CRMs: Wildberries, Ozon, Yandex Market, Bitrix24, amoCRM. Works with Claude Code, Cursor, Claude Desktop — locally over stdio or hosted over Streamable HTTP.",
   "type": "module",
   "bin": {
     "tkbk-mcp": "src/cli.mjs"
@@ -11,7 +11,9 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test \"test/*.test.mjs\""
+    "test": "node --test \"test/*.test.mjs\"",
+    "start": "node src/cli.mjs http",
+    "key-id": "node src/cli.mjs key-id"
   },
   "engines": {
     "node": ">=20"
