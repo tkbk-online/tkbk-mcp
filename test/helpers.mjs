@@ -9,7 +9,8 @@ export const realFetch = globalThis.fetch;
 /**
  * Replace globalThis.fetch: every call is recorded; the newest route whose regexp matches the URL answers.
  * route(match, body, status = 200, headers = {}) — body may be a function (url, init, n) => body | {status, body, headers}
- * with n — how many times this route answered before.
+ * with n — how many times this route answered before. {raw, status?, headers?} answers with that text as it is (not JSON:
+ * a TSV report, an empty 201/202).
  * @returns {{calls: Array<{url: string, init: RequestInit}>, route: Function, last: () => {url: string, init: RequestInit, body: any}}}
  */
 export function installFetchMock() {
@@ -22,6 +23,7 @@ export function installFetchMock() {
     if (!r) return json({ message: 'not found' }, 404);
     const n = r.count++;
     const out = typeof r.body === 'function' ? r.body(url, init, n) : r.body; // may throw: a network error
+    if (out && typeof out === 'object' && 'raw' in out) return new Response(out.raw, { status: out.status ?? r.status, headers: { ...r.headers, ...out.headers } });
     if (out && typeof out === 'object' && 'status' in out && 'body' in out) return json(out.body, out.status, out.headers);
     return json(out, r.status, r.headers);
   };

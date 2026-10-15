@@ -16,6 +16,8 @@ export const CREDENTIAL_HEADERS = Object.freeze({
   AVITO_CLIENT_SECRET: 'x-avito-client-secret',
   DADATA_API_KEY: 'x-dadata-key',
   DADATA_SECRET: 'x-dadata-secret',
+  DIRECT_TOKEN: 'x-direct-token',
+  DIRECT_CLIENT_LOGIN: 'x-direct-client-login',
 });
 
 const MAX_SECRET_LENGTH = 4096;
@@ -29,8 +31,11 @@ const AMO_DEFAULT_ZONE = 'amocrm.ru';
 const B24_HOST = new RegExp(`^${LABEL}\\.bitrix24\\.(?:ru|by|kz|ua|com|de|eu|es|fr|it|pl|uk|in|com\\.br|jp|cn|com\\.tr|id|vn)$`);
 const B24_PATH = /^\/rest\/(\d{1,12})\/([A-Za-z0-9_]{4,64})\/?$/;
 
+const YANDEX_LOGIN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+
 const secret = (v) => (v.length <= MAX_SECRET_LENGTH && SECRET.test(v) ? v : null);
 const numericId = (v) => (NUMERIC_ID.test(v) ? v : null);
+const yandexLogin = (v) => (YANDEX_LOGIN.test(v) ? v : null);
 
 /** "shop", "shop.amocrm.ru", "https://shop.kommo.com/" → host; anything else → null. */
 function amoDomain(v) {
@@ -63,6 +68,8 @@ const RULES = {
   AVITO_CLIENT_SECRET: { parse: secret, expected: 'the Avito client_secret' },
   DADATA_API_KEY: { parse: secret, expected: 'the DaData API key' },
   DADATA_SECRET: { parse: secret, expected: 'the DaData secret key' },
+  DIRECT_TOKEN: { parse: secret, expected: 'the Yandex Direct OAuth token' },
+  DIRECT_CLIENT_LOGIN: { parse: yandexLogin, expected: 'the Yandex login of the advertiser (a client of your agency)' },
 };
 
 /**

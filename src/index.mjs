@@ -5,6 +5,7 @@ import bitrix24 from './services/bitrix24.mjs';
 import amocrm from './services/amocrm.mjs';
 import avito from './services/avito.mjs';
 import dadata from './services/dadata.mjs';
+import yandexDirect from './services/yandex-direct.mjs';
 
 /** CLI names (`tkbk-mcp <name>`) and hosted names (`/mcp/<name>`) of the services. */
 export const SERVICES = {
@@ -15,5 +16,6 @@ export const SERVICES = {
   amocrm, amo: amocrm,
   avito,
   dadata,
+  'yandex-direct': yandexDirect, direct: yandexDirect,
 };
 export { buildServer } from './core.mjs';
