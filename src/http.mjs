@@ -26,7 +26,7 @@ const KEY_ID_LOG_CHARS = 12;
 const JSONRPC_SERVER_ERROR = -32000;
 const ROUTE = /^\/mcp\/([a-z0-9-]+)\/?$/;
 /** Documented endpoints; the long names (wildberries, yandex-market, bitrix24, amocrm, yandex-direct …) work too. */
-export const HOSTED_PATHS = ['wb', 'ozon', 'ym', 'b24', 'amo', 'dadata'];
+export const HOSTED_PATHS = ['wb', 'ozon', 'ym', 'b24', 'amo', 'avito', 'dadata'];
 
 const writeLog = (entry) => process.stdout.write(`${JSON.stringify({ t: new Date().toISOString(), ...entry })}\n`);
 
