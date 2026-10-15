@@ -2,8 +2,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { bearerKey, createAllowList, createKeyValidator, isKeyFormat, keyIdOf, parseKeyIds } from '../src/hosted/auth.mjs';
-import { credentialsFor, missingHeadersHint } from '../src/hosted/credentials.mjs';
+import { CREDENTIAL_HEADERS, credentialsFor, missingHeadersHint } from '../src/hosted/credentials.mjs';
 import { bucketOf, clientIp, createRateLimiter } from '../src/hosted/limits.mjs';
+import { HOSTED_PATHS } from '../src/http.mjs';
 import { SERVICES } from '../src/index.mjs';
 
 const KEY = `cr_${'a'.repeat(64)}`;
@@ -148,6 +149,17 @@ test('credentials: no header can point a request at our own network or another h
   assert.deepEqual(onPremise, { env: { BITRIX24_WEBHOOK_URL: 'https://crm.shop.ru/rest/1/abcd/' } });
   assert.match(credentialsFor(SERVICES.ozon, { 'x-ozon-client-id': '12a' }).error, /x-ozon-client-id/);
   assert.match(credentialsFor(SERVICES.wb, { 'x-wb-token': 'two words' }).error, /x-wb-token/);
+});
+
+test('hosted: every documented path is a service with tools; the new services take each credential from a header', () => {
+  for (const path of HOSTED_PATHS) assert.ok(SERVICES[path]?.tools.length > 0, path);
+  for (const path of ['avito', 'direct', 'metrika', 'webmaster', 'dadata']) {
+    const service = SERVICES[path];
+    for (const name of [...service.env, ...(service.optionalEnv ?? [])]) {
+      assert.deepEqual(credentialsFor(service, { [CREDENTIAL_HEADERS[name]]: 'abc123' }), { env: { [name]: 'abc123' } }, `${path}: ${name}`);
+    }
+  }
+  assert.match(missingHeadersHint(['AVITO_CLIENT_ID', 'AVITO_CLIENT_SECRET']), /headers x-avito-client-id, x-avito-client-secret/);
 });
 
 test('rate limiter: a burst of perMinute, then retry-after; tokens come back over time; 0 — off', () => {
