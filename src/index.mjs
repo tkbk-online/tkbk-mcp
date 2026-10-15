@@ -7,6 +7,7 @@ import avito from './services/avito.mjs';
 import dadata from './services/dadata.mjs';
 import yandexDirect from './services/yandex-direct.mjs';
 import yandexMetrika from './services/yandex-metrika.mjs';
+import yandexWebmaster from './services/yandex-webmaster.mjs';
 
 /** CLI names (`tkbk-mcp <name>`) and hosted names (`/mcp/<name>`) of the services. */
 export const SERVICES = {
@@ -19,5 +20,6 @@ export const SERVICES = {
   dadata,
   'yandex-direct': yandexDirect, direct: yandexDirect,
   'yandex-metrika': yandexMetrika, metrika: yandexMetrika,
+  'yandex-webmaster': yandexWebmaster, webmaster: yandexWebmaster,
 };
 export { buildServer } from './core.mjs';
