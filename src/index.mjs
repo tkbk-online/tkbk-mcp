@@ -3,6 +3,15 @@ import ozon from './services/ozon.mjs';
 import yandexMarket from './services/yandex-market.mjs';
 import bitrix24 from './services/bitrix24.mjs';
 import amocrm from './services/amocrm.mjs';
+import dadata from './services/dadata.mjs';
 
-export const SERVICES = { wb: wildberries, wildberries, ozon, 'yandex-market': yandexMarket, ym: yandexMarket, bitrix24, b24: bitrix24, amocrm, amo: amocrm };
+/** CLI names (`tkbk-mcp <name>`) and hosted names (`/mcp/<name>`) of the services. */
+export const SERVICES = {
+  wb: wildberries, wildberries,
+  ozon,
+  'yandex-market': yandexMarket, ym: yandexMarket,
+  bitrix24, b24: bitrix24,
+  amocrm, amo: amocrm,
+  dadata,
+};
 export { buildServer } from './core.mjs';

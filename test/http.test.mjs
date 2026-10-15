@@ -14,6 +14,8 @@ const key = (digit) => `cr_${String(digit).repeat(64)}`;
 const [E2E, CACHED, NO_SUB, BAD, RATE, DOWN] = [1, 2, 3, 4, 5, 6].map(key);
 const SUBSCRIBED = new Set([E2E, CACHED, RATE, DOWN].map(keyIdOf));
 const WB_SECRET = 'wb-secret-token';
+const DADATA_KEY = 'dadata-key-value';
+const DADATA_SECRET = 'dadata-secret-value';
 
 const gateway = { calls: [], down: false };
 const gatewayFetch = async (url, init) => {
@@ -131,6 +133,23 @@ test('header credentials: a webhook into our own network is refused with 400 and
   assert.equal(api.calls.length, before);
 });
 
+test('hosted DaData: the key and secret headers reach the API; a call without the key names the header', async () => {
+  api.route(/findById\/bank$/, { suggestions: [{ value: 'ПАО Сбербанк', data: { bic: '044525225' } }] });
+  api.route(/clean\/address$/, [{ source: 'мск', result: 'г Москва', qc: 0 }]);
+  const dadata = await mcpClient(base, '/mcp/dadata', { ...bearer(E2E), 'x-dadata-key': DADATA_KEY, 'x-dadata-secret': DADATA_SECRET });
+  const bank = await dadata.callTool({ name: 'dadata_bank', arguments: { query: '044525225' } });
+  assert.deepEqual(JSON.parse(bank.content[0].text).banks, [{ name: 'ПАО Сбербанк', bic: '044525225' }]);
+  assert.equal(api.calls.at(-1).init.headers.Authorization, `Token ${DADATA_KEY}`);
+  await dadata.callTool({ name: 'dadata_address', arguments: { query: 'мск', mode: 'clean' } });
+  assert.equal(api.calls.at(-1).init.headers['X-Secret'], DADATA_SECRET);
+  await dadata.close();
+  const bare = await mcpClient(base, '/mcp/dadata', bearer(E2E));
+  const r = await bare.callTool({ name: 'dadata_bank', arguments: { query: '044525225' } });
+  assert.equal(r.isError, true);
+  assert.match(r.content[0].text, /x-dadata-key/);
+  await bare.close();
+});
+
 test('rate limit per key: 429 with retry-after once the minute is used up', async () => {
   const limited = await start({ ratePerMin: 2 });
   assert.equal((await post(limited, '/mcp/wb', bearer(RATE))).status, 200);
@@ -166,7 +185,7 @@ test('gateway unavailable: an unknown key gets 503 with retry-after', async () =
 
 test('logs: key ids and tool names, never keys or marketplace credentials', () => {
   const text = JSON.stringify(logs);
-  for (const secret of [E2E, CACHED, BAD, NO_SUB, WB_SECRET, 'amo-secret', 'not-for-wb']) assert.ok(!text.includes(secret), secret);
+  for (const secret of [E2E, CACHED, BAD, NO_SUB, WB_SECRET, 'amo-secret', 'not-for-wb', DADATA_KEY, DADATA_SECRET]) assert.ok(!text.includes(secret), secret);
   assert.ok(logs.some((l) => l.kind === 'tool' && l.tool === 'wb_new_orders' && l.ok && l.key === keyIdOf(E2E).slice(0, 12)));
   assert.ok(logs.some((l) => l.kind === 'mcp' && l.status === 403 && l.reason === 'no-subscription'));
 });

@@ -12,6 +12,8 @@ export const CREDENTIAL_HEADERS = Object.freeze({
   AMOCRM_DOMAIN: 'x-amo-subdomain',
   AMOCRM_TOKEN: 'x-amo-token',
   BITRIX24_WEBHOOK_URL: 'x-b24-webhook',
+  DADATA_API_KEY: 'x-dadata-key',
+  DADATA_SECRET: 'x-dadata-secret',
 });
 
 const MAX_SECRET_LENGTH = 4096;
@@ -55,6 +57,8 @@ const RULES = {
   AMOCRM_DOMAIN: { parse: amoDomain, expected: 'yourcompany or yourcompany.amocrm.ru' },
   AMOCRM_TOKEN: { parse: secret, expected: 'the amoCRM long-lived token' },
   BITRIX24_WEBHOOK_URL: { parse: b24Webhook, expected: 'https://<portal>.bitrix24.ru/rest/<user id>/<code>/' },
+  DADATA_API_KEY: { parse: secret, expected: 'the DaData API key' },
+  DADATA_SECRET: { parse: secret, expected: 'the DaData secret key' },
 };
 
 /**

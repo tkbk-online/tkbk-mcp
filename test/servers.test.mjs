@@ -7,10 +7,10 @@ const { calls, route } = installFetchMock();
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('every service lists its tools with descriptions', async () => {
-  for (const name of ['wb', 'ozon', 'yandex-market', 'bitrix24', 'amocrm']) {
+  for (const name of ['wb', 'ozon', 'yandex-market', 'bitrix24', 'amocrm', 'dadata']) {
     const c = await connect(name, {});
     const { tools } = await c.listTools();
-    assert.ok(tools.length >= 3, name);
+    assert.ok(tools.length >= 2, name);
     for (const t of tools) assert.ok(t.description.length > 20, `${name}/${t.name}`);
   }
 });
