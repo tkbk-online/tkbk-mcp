@@ -1,7 +1,7 @@
 {
   "name": "@tkbk/mcp",
-  "version": "0.2.0",
-  "description": "MCP servers for Russian marketplaces and CRMs: Wildberries, Ozon, Yandex Market, Bitrix24, amoCRM. Works with Claude Code, Cursor, Claude Desktop — locally over stdio or hosted over Streamable HTTP.",
+  "version": "0.3.0",
+  "description": "MCP servers for Russian marketplaces, CRMs, advertising and company data: Wildberries, Ozon, Yandex Market, Bitrix24, amoCRM, Avito, Yandex Direct, Yandex Metrika, Yandex Webmaster, DaData. Works with Claude Code, Cursor, Claude Desktop — locally over stdio or hosted over Streamable HTTP.",
   "type": "module",
   "bin": {
     "tkbk-mcp": "src/cli.mjs"
@@ -36,6 +36,11 @@
     "yandex-market",
     "bitrix24",
     "amocrm",
+    "avito",
+    "yandex-direct",
+    "yandex-metrika",
+    "yandex-webmaster",
+    "dadata",
     "claude-code",
     "cursor"
   ]
