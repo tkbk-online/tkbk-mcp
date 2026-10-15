@@ -6,6 +6,7 @@ import amocrm from './services/amocrm.mjs';
 import avito from './services/avito.mjs';
 import dadata from './services/dadata.mjs';
 import yandexDirect from './services/yandex-direct.mjs';
+import yandexMetrika from './services/yandex-metrika.mjs';
 
 /** CLI names (`tkbk-mcp <name>`) and hosted names (`/mcp/<name>`) of the services. */
 export const SERVICES = {
@@ -17,5 +18,6 @@ export const SERVICES = {
   avito,
   dadata,
   'yandex-direct': yandexDirect, direct: yandexDirect,
+  'yandex-metrika': yandexMetrika, metrika: yandexMetrika,
 };
 export { buildServer } from './core.mjs';

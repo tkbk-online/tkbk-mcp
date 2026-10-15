@@ -18,6 +18,7 @@ export const CREDENTIAL_HEADERS = Object.freeze({
   DADATA_SECRET: 'x-dadata-secret',
   DIRECT_TOKEN: 'x-direct-token',
   DIRECT_CLIENT_LOGIN: 'x-direct-client-login',
+  METRIKA_TOKEN: 'x-metrika-token',
 });
 
 const MAX_SECRET_LENGTH = 4096;
@@ -70,6 +71,7 @@ const RULES = {
   DADATA_SECRET: { parse: secret, expected: 'the DaData secret key' },
   DIRECT_TOKEN: { parse: secret, expected: 'the Yandex Direct OAuth token' },
   DIRECT_CLIENT_LOGIN: { parse: yandexLogin, expected: 'the Yandex login of the advertiser (a client of your agency)' },
+  METRIKA_TOKEN: { parse: secret, expected: 'the Yandex Metrika OAuth token' },
 };
 
 /**
