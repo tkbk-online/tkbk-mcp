@@ -110,7 +110,7 @@ claude mcp add ozon -e OZON_CLIENT_ID=123 -e OZON_API_KEY=ключ -- npx -y git
 }
 ```
 
-Модель для агента — любая, через один ключ TKBK: Claude, GPT, DeepSeek, GLM, Grok (`ANTHROPIC_BASE_URL=https://api.tkbk.online/claude`). Пробный ключ бесплатно: https://tkbk.online/account
+Модель для агента — любая, через один ключ TKBK: Claude, GPT, DeepSeek, GLM, Grok (`ANTHROPIC_BASE_URL=https://api.tkbk.online`). Пробный ключ бесплатно: https://tkbk.online/account
 
 ## Безопасность
 - Локально токены сервисов остаются на вашем компьютере и передаются только в API самого сервиса; на хостинге — живут один запрос.
