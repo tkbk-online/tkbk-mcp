@@ -77,7 +77,7 @@ docker exec tkbk-caddy wget -qO- http://tkbk-mcp:8787/healthz
 | `MCP_AUTH_FAIL_LIMIT` | `20` | неверных ключей с одного адреса за 10 минут, дальше 429 (0 — выкл.) |
 | `MCP_B24_HOSTS` | — | коробочные Битрикс24, которым можно (хосты через запятую) |
 
-id ключа — sha256 от ключа, сами ключи нигде не хранятся: `echo -n cr_… | npx -y github:berdniko9544-gif/tkbk-mcp key-id` или `docker exec -i tkbk-mcp node src/cli.mjs key-id < key.txt`.
+id ключа — sha256 от ключа, сами ключи нигде не хранятся: `echo -n cr_… | npx -y github:tkbk-online/tkbk-mcp key-id` или `docker exec -i tkbk-mcp node src/cli.mjs key-id < key.txt`.
 
 Биллинг: подписку проверяет функция `isSubscribed(keyId)` — по умолчанию allow-list выше. Своя проверка: `createHttpServer({ validator, isSubscribed: async (keyId) => … })` из `src/http.mjs`.
 
@@ -97,15 +97,15 @@ mcp.tkbk.online {
 
 **Claude Code**
 ```bash
-claude mcp add wb -e WB_TOKEN=ваш_токен -- npx -y github:berdniko9544-gif/tkbk-mcp wb
-claude mcp add ozon -e OZON_CLIENT_ID=123 -e OZON_API_KEY=ключ -- npx -y github:berdniko9544-gif/tkbk-mcp ozon
+claude mcp add wb -e WB_TOKEN=ваш_токен -- npx -y github:tkbk-online/tkbk-mcp wb
+claude mcp add ozon -e OZON_CLIENT_ID=123 -e OZON_API_KEY=ключ -- npx -y github:tkbk-online/tkbk-mcp ozon
 ```
 
 **Cursor / Claude Desktop** (`mcp.json` / `claude_desktop_config.json`)
 ```json
 {
   "mcpServers": {
-    "wildberries": { "command": "npx", "args": ["-y", "github:berdniko9544-gif/tkbk-mcp", "wb"], "env": { "WB_TOKEN": "ваш_токен" } }
+    "wildberries": { "command": "npx", "args": ["-y", "github:tkbk-online/tkbk-mcp", "wb"], "env": { "WB_TOKEN": "ваш_токен" } }
   }
 }
 ```
