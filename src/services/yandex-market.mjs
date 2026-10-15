@@ -1,6 +1,6 @@
 // Yandex Market Partner API. Partner cabinet → Settings → API and modules → API-key token. Header `Api-Key`.
 // YM_BUSINESS_ID (optional) — cabinet id for orders and offers; without it the cabinet of the token's stores is used.
-import { collectPages, DAY_MS, request, z } from '../core.mjs';
+import { collectPages, DAY_MS, isoDate, queryString, request, z } from '../core.mjs';
 
 const YM_URL = 'https://api.partner.market.yandex.ru';
 const CAMPAIGNS_PAGE = 100; // maximum of GET /v2/campaigns (page/pageSize were switched off on 05.10.2026)
@@ -13,18 +13,12 @@ const ORDERS_DEFAULT_DAYS = 7;
 const OFFERS_PAGE = 100; // maximum of POST /v2/businesses/{businessId}/offer-mappings
 const OFFERS_MAX = 500;
 const OFFERS_DEFAULT = 50;
-const ISO_DATE_LENGTH = 10;
 
 const base = (env) => (env.YM_API_URL || YM_URL).replace(/\/+$/, '');
 const auth = (env) => ({ 'Api-Key': env.YM_API_KEY });
-const query = (params) => {
-  const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)]));
-  return q.size ? `?${q}` : '';
-};
-const get = (env, path, params = {}) => request(`${base(env)}${path}${query(params)}`, { headers: auth(env) });
+const get = (env, path, params = {}) => request(`${base(env)}${path}${queryString(params)}`, { headers: auth(env) });
 /** Lists sent as POST are reads: network errors and 5xx may be retried. */
-const list = (env, path, params, body) => request(`${base(env)}${path}${query(params)}`, { method: 'POST', headers: auth(env), body, idempotent: true });
-const isoDate = (ms) => new Date(ms).toISOString().slice(0, ISO_DATE_LENGTH);
+const list = (env, path, params, body) => request(`${base(env)}${path}${queryString(params)}`, { method: 'POST', headers: auth(env), body, idempotent: true });
 const money = (price) => price?.value;
 
 /** Cabinet id: the argument, YM_BUSINESS_ID, or the cabinet of the token's stores (an Api-Key token belongs to one cabinet). */

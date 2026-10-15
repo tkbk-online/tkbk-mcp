@@ -24,6 +24,7 @@ const MAX_RETRY_WAIT_MS = 20_000;
 const RETRY_BUDGET_MS = 60_000;
 const ERROR_TEXT_MAX = 300;
 const MS_PER_SECOND = 1_000;
+const ISO_DATE_LENGTH = 10;
 /** 429 — everyone; 420 "Method Failure" — Yandex Market's rate limit. The request was not processed: safe to repeat. */
 const RATE_LIMIT_STATUSES = new Set([420, 429]);
 /** Repeated only for idempotent requests (reads): a write may have gone through. */
@@ -58,14 +59,23 @@ export function retryDelayMs(headers, attempt, now = Date.now()) {
   return BASE_BACKOFF_MS * 2 ** attempt;
 }
 
+/** Yandex Direct `{error: {error_string, error_detail}}` and Webmaster `{error_code, error_message}` answers. */
+function yandexError(data) {
+  if (data.error && typeof data.error === 'object') return [data.error.error_string, data.error.error_detail].filter(Boolean).join(': ');
+  return data.error_message ? [data.error_code, data.error_message].filter(Boolean).join(': ') : '';
+}
+
 function errorText(data, text) {
   if (typeof data === 'object' && data) {
-    return data.message || data.detail || data.title || data.error?.message || data.errors?.[0]?.message || data.error_description || JSON.stringify(data).slice(0, ERROR_TEXT_MAX);
+    return data.message || data.detail || data.title || data.error?.message || yandexError(data) || data.errors?.[0]?.message || data.error_description || JSON.stringify(data).slice(0, ERROR_TEXT_MAX);
   }
   return String(text).slice(0, ERROR_TEXT_MAX);
 }
 
-/** One attempt: {ok: true, data} or {ok: false, status (0 — not reachable), headers, message}. */
+/** Objects go out as JSON; a string goes as it is (a form: send your own lowercase `content-type` header with it). */
+const encodeBody = (body) => (body === undefined || typeof body === 'string' ? body : JSON.stringify(body));
+
+/** One attempt: {ok: true, data, status, headers} or {ok: false, status (0 — not reachable), headers, message}. */
 async function attemptOnce(url, { method, headers, body, timeoutMs }) {
   let res;
   let text;
@@ -73,7 +83,7 @@ async function attemptOnce(url, { method, headers, body, timeoutMs }) {
     res = await fetch(url, {
       method,
       headers: { accept: 'application/json', ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...headers },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: encodeBody(body),
       signal: AbortSignal.timeout(timeoutMs),
     });
     text = await res.text();
@@ -82,7 +92,7 @@ async function attemptOnce(url, { method, headers, body, timeoutMs }) {
   }
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (res.ok) return { ok: true, data };
+  if (res.ok) return { ok: true, data, status: res.status, headers: res.headers };
   return { ok: false, status: res.status, headers: res.headers, message: `HTTP ${res.status}: ${errorText(data, text)}` };
 }
 
@@ -91,15 +101,17 @@ async function attemptOnce(url, { method, headers, body, timeoutMs }) {
  * idempotent (GET by default; reads sent as POST pass idempotent: true). The service's error text is kept short and
  * never contains our credentials.
  * @param {string} url
- * @param {{method?: string, headers?: Record<string, string>, body?: unknown, timeoutMs?: number, idempotent?: boolean, sleep?: (ms: number) => Promise<unknown>}} [options]
+ * @param {{method?: string, headers?: Record<string, string>, body?: unknown, timeoutMs?: number, idempotent?: boolean, full?: boolean, sleep?: (ms: number) => Promise<unknown>}} [options]
+ *   body — an object (sent as JSON) or a string (sent as it is); full — resolve {data, status, headers} instead of the
+ *   data alone (for services that answer 200, 201 and 202 differently)
  * @returns {Promise<any>} parsed JSON (text when the answer is not JSON, null when empty)
  * @throws {ApiError}
  */
-export async function request(url, { method = 'GET', headers = {}, body, timeoutMs = REQUEST_TIMEOUT_MS, idempotent = method === 'GET', sleep = delay } = {}) {
+export async function request(url, { method = 'GET', headers = {}, body, timeoutMs = REQUEST_TIMEOUT_MS, idempotent = method === 'GET', full = false, sleep = delay } = {}) {
   const started = Date.now();
   for (let attempt = 0; ; attempt++) {
     const r = await attemptOnce(url, { method, headers, body, timeoutMs });
-    if (r.ok) return r.data;
+    if (r.ok) return full ? { data: r.data, status: r.status, headers: r.headers } : r.data;
     const limited = RATE_LIMIT_STATUSES.has(r.status);
     const retryable = limited || (idempotent && (r.status === NETWORK_ERROR || TRANSIENT_STATUSES.has(r.status)));
     const wait = retryDelayMs(r.headers, attempt);
@@ -135,6 +147,62 @@ export async function collectPages(fetchPage, { limit, pageSize, cursor, maxPage
 
 /** ISO date-time `days` ago. */
 export const isoDaysAgo = (days, now = Date.now()) => new Date(now - days * DAY_MS).toISOString();
+
+/** `YYYY-MM-DD` (UTC) of a timestamp, today by default. */
+export const isoDate = (ms = Date.now()) => new Date(ms).toISOString().slice(0, ISO_DATE_LENGTH);
+
+/** `?a=1&b=2` from the defined, non-empty values (an array repeats its key); '' when there is nothing to send. */
+export function queryString(params = {}) {
+  const q = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    for (const v of Array.isArray(value) ? value : [value]) {
+      if (v !== undefined && v !== null && v !== '') q.append(key, String(v));
+    }
+  }
+  return q.size ? `?${q}` : '';
+}
+
+const perEnv = new WeakMap(); // env object → Map(key → {promise, value, done})
+
+/**
+ * Memoize an async lookup (an OAuth token, an account id) for the life of one env object. Stdio: the whole process (its
+ * env is process.env). Hosted: one request (every request gets its own env), so nothing outlives the credentials it
+ * was made with. Concurrent callers share one load; a failed load is not cached.
+ * @template T
+ * @param {object} env
+ * @param {string} key
+ * @param {() => Promise<T>} load
+ * @param {(value: T) => boolean} [isFresh]  a finished value that is not fresh any more is loaded again
+ * @returns {Promise<T>}
+ */
+export function cachedPerEnv(env, key, load, isFresh = () => true) {
+  let slots = perEnv.get(env);
+  if (!slots) {
+    slots = new Map();
+    perEnv.set(env, slots);
+  }
+  const hit = slots.get(key);
+  if (hit && (!hit.done || isFresh(hit.value))) return hit.promise;
+  const entry = { done: false, value: undefined, promise: undefined };
+  entry.promise = Promise.resolve().then(load).then(
+    (value) => {
+      entry.value = value;
+      entry.done = true;
+      return value;
+    },
+    (e) => {
+      if (slots.get(key) === entry) slots.delete(key);
+      throw e;
+    },
+  );
+  slots.set(key, entry);
+  return entry.promise;
+}
+
+/** Drop a memoized value (a token the service has rejected). */
+export function forgetPerEnv(env, key) {
+  perEnv.get(env)?.delete(key);
+}
 
 /** Compact JSON for the model: drop empty values, cap long arrays. */
 export function compact(value, maxItems = DEFAULT_MAX_ITEMS) {

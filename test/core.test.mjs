@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiError, collectPages, compact, request, retryDelayMs } from '../src/core.mjs';
+import { ApiError, cachedPerEnv, collectPages, compact, forgetPerEnv, isoDate, queryString, request, retryDelayMs } from '../src/core.mjs';
 import { connect, installFetchMock, textOf } from './helpers.mjs';
 
 const { calls, route } = installFetchMock();
@@ -96,4 +96,50 @@ test('buildServer: onCall reports tool, outcome and time — never the arguments
   assert.equal(seen[0].tool, 'wb_new_orders');
   const bare = await connect('wb', {}, { configHint: (missing) => `need ${missing.join('+')}` });
   assert.equal(textOf(await bare.callTool({ name: 'wb_new_orders', arguments: {} })), 'need WB_TOKEN');
+});
+
+test('request: a string body goes as it is under the caller content-type; full gives status and headers', async () => {
+  route(/echo-form/, (url, init) => ({ got: init.body, type: init.headers['content-type'] }));
+  const form = await request('https://api.test/echo-form', { method: 'POST', body: 'a=1&b=2', headers: { 'content-type': 'application/x-www-form-urlencoded' } });
+  assert.deepEqual(form, { got: 'a=1&b=2', type: 'application/x-www-form-urlencoded' });
+  route(/queued-202/, { queued: true }, 202, { retryin: '3' });
+  const full = await request('https://api.test/queued-202', { method: 'POST', body: {}, full: true });
+  assert.equal(full.status, 202);
+  assert.equal(full.headers.get('retryIn'), '3');
+  assert.deepEqual(full.data, { queued: true });
+});
+
+test('request: Yandex Direct and Webmaster error shapes are readable', async () => {
+  route(/direct-error/, { error: { error_code: 53, error_string: 'Ошибка авторизации', error_detail: 'Bad token' } }, 400);
+  await assert.rejects(request('https://api.test/direct-error', { method: 'POST', body: {} }), /HTTP 400: Ошибка авторизации: Bad token/);
+  route(/webmaster-error/, { error_code: 'HOST_NOT_VERIFIED', error_message: 'not verified' }, 404);
+  await assert.rejects(request('https://api.test/webmaster-error'), /HTTP 404: HOST_NOT_VERIFIED: not verified/);
+});
+
+test('queryString: skips empty values, repeats the key of an array, encodes', () => {
+  assert.equal(queryString({ a: 1, b: '', c: undefined, d: null, e: ['x', 'y'], f: 'a b' }), '?a=1&e=x&e=y&f=a+b');
+  assert.equal(queryString({}), '');
+  assert.equal(queryString(), '');
+});
+
+test('isoDate: the UTC day of a timestamp', () => {
+  assert.equal(isoDate(Date.parse('2026-10-15T23:59:59Z')), '2026-10-15');
+  assert.match(isoDate(), /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('cachedPerEnv: concurrent callers share one load; stale values reload; failures and other envs are not cached', async () => {
+  const env = {};
+  let loads = 0;
+  const load = async () => ({ n: ++loads, fresh: true });
+  const [a, b] = await Promise.all([cachedPerEnv(env, 'k', load), cachedPerEnv(env, 'k', load)]);
+  assert.equal(a, b);
+  assert.equal(loads, 1);
+  assert.equal((await cachedPerEnv({}, 'k', load)).n, 2, 'another env loads on its own');
+  a.fresh = false;
+  assert.equal((await cachedPerEnv(env, 'k', load, (v) => v.fresh)).n, 3, 'a value that is not fresh is loaded again');
+  forgetPerEnv(env, 'k');
+  assert.equal((await cachedPerEnv(env, 'k', load)).n, 4);
+  const failing = {};
+  await assert.rejects(cachedPerEnv(failing, 'x', async () => { throw new Error('boom'); }), /boom/);
+  assert.equal(await cachedPerEnv(failing, 'x', async () => 'ok'), 'ok', 'a failed load is not cached');
 });
