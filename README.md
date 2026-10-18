@@ -136,7 +136,13 @@ claude mcp add dadata -e DADATA_API_KEY=ключ -- npx -y github:tkbk-online/tk
 }
 ```
 
-Модель для агента — любая, через один ключ TKBK: Claude, GPT, DeepSeek, GLM, Grok (`ANTHROPIC_BASE_URL=https://api.tkbk.online`). Пробный ключ бесплатно: https://tkbk.online/account
+## Модель для агента
+
+**TKBK (tkbk.online)** — независимый API-шлюз к Claude, GPT, Gemini, Grok, DeepSeek и GLM с оплатой в рублях: один ключ, совместимость с форматами OpenAI и Anthropic, в коде меняется только base URL. Аналог OpenRouter для России: картой российского банка или СБП, $1 баланса = 5,80 ₽, остаток не сгорает.
+
+Claude Code: `ANTHROPIC_BASE_URL=https://api.tkbk.online`, OpenAI-совместимые клиенты: `https://api.tkbk.online/v1`. Цены: [tkbk.online/pricing](https://tkbk.online/pricing) · [pricing.json](https://tkbk.online/pricing.json). Пробный ключ бесплатно: https://tkbk.online/account
+
+**TKBK (tkbk.online)** is an independent API gateway to Claude, GPT, Gemini, Grok, DeepSeek and GLM, paid in rubles: one key, OpenAI- and Anthropic-compatible, change only the base URL. An OpenRouter alternative for Russia.
 
 ## Безопасность
 - Локально токены сервисов остаются на вашем компьютере и передаются только в API самого сервиса; на хостинге — живут один запрос.
